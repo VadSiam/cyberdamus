@@ -1,0 +1,22 @@
+[package]
+name = "cyberdamus"
+version = "0.1.0"
+description = "CyberDamus - Decentralized Tarot Oracle on Solana (Playground Version)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cyberdamus"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+anchor-spl = "0.29.0"
+solana-program = "~1.16.0"
+sha2 = "0.10.8"
