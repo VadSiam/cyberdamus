@@ -1,8 +1,7 @@
 // 🔮 CyberDamus Client - Solana Playground Version
-// Complete TypeScript client for testing the Tarot oracle
+// Complete TypeScript client for testing the Tarot oracle - FULL 78 CARDS
 
-import * as anchor from "@coral-xyz/anchor";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, setProvider } from "@coral-xyz/anchor";
 import {
   PublicKey,
   Keypair,
@@ -14,239 +13,111 @@ import {
 } from "@solana/web3.js";
 
 // ============================================================================
-// CARD DATA - 22 Major Arcana SVGs (Simplified for Playground)
+// CARD DATA - Complete 78 Tarot Cards (Lightweight SVGs)
 // ============================================================================
 
+// Major Arcana (0-21)
 const MAJOR_ARCANA_SVGS = [
   // 0 - The Fool
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="30" cy="45" r="15" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">0</text>
-  <text x="30" y="80" text-anchor="middle" fill="#ffd700" font-size="8">FOOL</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><circle cx="30" cy="45" r="15" fill="none" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">0</text><text x="30" y="80" text-anchor="middle" fill="#ffd700" font-size="8">FOOL</text></svg>`,
 
   // 1 - The Magician
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <polygon points="30,25 35,40 25,40" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <polygon points="30,55 35,70 25,70" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">I</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">MAGICIAN</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><polygon points="30,25 35,40 25,40" fill="none" stroke="#ffd700" stroke-width="2"/><polygon points="30,55 35,70 25,70" fill="none" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">I</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">MAGICIAN</text></svg>`,
 
   // 2 - The High Priestess
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <path d="M 20 40 Q 30 30 40 40" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <path d="M 20 55 Q 30 65 40 55" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">II</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">PRIESTESS</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><path d="M 20 40 Q 30 30 40 40" fill="none" stroke="#ffd700" stroke-width="2"/><path d="M 20 55 Q 30 65 40 55" fill="none" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">II</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">PRIESTESS</text></svg>`,
 
   // 3 - The Empress
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <polygon points="30,30 40,50 20,50" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <polygon points="30,60 20,50 40,50" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">III</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">EMPRESS</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><polygon points="30,30 40,50 20,50" fill="none" stroke="#ffd700" stroke-width="2"/><polygon points="30,60 20,50 40,50" fill="none" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">III</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">EMPRESS</text></svg>`,
 
   // 4 - The Emperor
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <rect x="20" y="35" width="20" height="20" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <rect x="25" y="60" width="10" height="10" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">IV</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">EMPEROR</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><rect x="20" y="35" width="20" height="20" fill="none" stroke="#ffd700" stroke-width="2"/><rect x="25" y="60" width="10" height="10" fill="none" stroke="#ffd700" stroke-width="1"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">IV</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">EMPEROR</text></svg>`,
 
   // 5 - The Hierophant
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <line x1="20" y1="35" x2="40" y2="35" stroke="#ffd700" stroke-width="2"/>
-  <line x1="20" y1="45" x2="40" y2="45" stroke="#ffd700" stroke-width="2"/>
-  <line x1="20" y1="55" x2="40" y2="55" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">V</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">HIEROPHANT</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><line x1="20" y1="35" x2="40" y2="35" stroke="#ffd700" stroke-width="2"/><line x1="20" y1="45" x2="40" y2="45" stroke="#ffd700" stroke-width="2"/><line x1="20" y1="55" x2="40" y2="55" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">V</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">HIEROPHANT</text></svg>`,
 
   // 6 - The Lovers
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <path d="M 25 45 Q 20 35 15 45 Q 20 55 25 45" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <path d="M 35 45 Q 40 35 45 45 Q 40 55 35 45" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">VI</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">LOVERS</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><path d="M 25 45 Q 20 35 15 45 Q 20 55 25 45" fill="none" stroke="#ffd700" stroke-width="2"/><path d="M 35 45 Q 40 35 45 45 Q 40 55 35 45" fill="none" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">VI</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">LOVERS</text></svg>`,
 
   // 7 - The Chariot
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <rect x="15" y="40" width="30" height="15" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="20" cy="65" r="5" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="40" cy="65" r="5" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">VII</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">CHARIOT</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><rect x="15" y="40" width="30" height="15" fill="none" stroke="#ffd700" stroke-width="2"/><circle cx="20" cy="65" r="5" fill="none" stroke="#ffd700" stroke-width="1"/><circle cx="40" cy="65" r="5" fill="none" stroke="#ffd700" stroke-width="1"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">VII</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">CHARIOT</text></svg>`,
 
   // 8 - Strength
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <path d="M 15 35 L 45 60 M 45 35 L 15 60" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="30" cy="47" r="10" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">VIII</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">STRENGTH</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><path d="M 15 35 L 45 60 M 45 35 L 15 60" stroke="#ffd700" stroke-width="2"/><circle cx="30" cy="47" r="10" fill="none" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">VIII</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">STRENGTH</text></svg>`,
 
   // 9 - The Hermit
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="25" cy="45" r="3" fill="#ffd700"/>
-  <line x1="25" y1="45" x2="35" y2="55" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="30" cy="30" r="6" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">IX</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">HERMIT</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><circle cx="25" cy="45" r="3" fill="#ffd700"/><line x1="25" y1="45" x2="35" y2="55" stroke="#ffd700" stroke-width="2"/><circle cx="30" cy="30" r="6" fill="none" stroke="#ffd700" stroke-width="1"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">IX</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">HERMIT</text></svg>`,
 
   // 10 - Wheel of Fortune
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="30" cy="45" r="15" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <line x1="30" y1="30" x2="30" y2="60" stroke="#ffd700" stroke-width="1"/>
-  <line x1="15" y1="45" x2="45" y2="45" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">X</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">FORTUNE</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><circle cx="30" cy="45" r="15" fill="none" stroke="#ffd700" stroke-width="2"/><line x1="30" y1="30" x2="30" y2="60" stroke="#ffd700" stroke-width="1"/><line x1="15" y1="45" x2="45" y2="45" stroke="#ffd700" stroke-width="1"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">X</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">FORTUNE</text></svg>`,
 
   // 11 - Justice
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <line x1="30" y1="30" x2="30" y2="65" stroke="#ffd700" stroke-width="2"/>
-  <rect x="20" y="40" width="20" height="3" fill="#ffd700"/>
-  <circle cx="30" cy="55" r="5" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XI</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">JUSTICE</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><line x1="30" y1="30" x2="30" y2="65" stroke="#ffd700" stroke-width="2"/><rect x="20" y="40" width="20" height="3" fill="#ffd700"/><circle cx="30" cy="55" r="5" fill="none" stroke="#ffd700" stroke-width="1"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XI</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">JUSTICE</text></svg>`,
 
   // 12 - The Hanged Man
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <line x1="20" y1="30" x2="40" y2="30" stroke="#ffd700" stroke-width="2"/>
-  <line x1="30" y1="30" x2="30" y2="50" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="30" cy="55" r="5" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XII</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">HANGED MAN</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><line x1="20" y1="30" x2="40" y2="30" stroke="#ffd700" stroke-width="2"/><line x1="30" y1="30" x2="30" y2="50" stroke="#ffd700" stroke-width="2"/><circle cx="30" cy="55" r="5" fill="none" stroke="#ffd700" stroke-width="1"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XII</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">HANGED MAN</text></svg>`,
 
   // 13 - Death
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <rect x="25" y="35" width="10" height="25" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="30" cy="30" r="5" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <line x1="20" y1="65" x2="40" y2="65" stroke="#ffd700" stroke-width="2"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XIII</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">DEATH</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><rect x="25" y="35" width="10" height="25" fill="none" stroke="#ffd700" stroke-width="2"/><circle cx="30" cy="30" r="5" fill="none" stroke="#ffd700" stroke-width="1"/><line x1="20" y1="65" x2="40" y2="65" stroke="#ffd700" stroke-width="2"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XIII</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">DEATH</text></svg>`,
 
   // 14 - Temperance
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <rect x="20" y="35" width="8" height="20" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <rect x="32" y="40" width="8" height="20" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <path d="M 28 45 Q 30 48 32 45" stroke="#ffd700" stroke-width="1" fill="none"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XIV</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">TEMPERANCE</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><rect x="20" y="35" width="8" height="20" fill="none" stroke="#ffd700" stroke-width="1"/><rect x="32" y="40" width="8" height="20" fill="none" stroke="#ffd700" stroke-width="1"/><path d="M 28 45 Q 30 48 32 45" stroke="#ffd700" stroke-width="1" fill="none"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XIV</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">TEMPERANCE</text></svg>`,
 
   // 15 - The Devil
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <polygon points="30,25 35,45 25,45" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <polygon points="30,65 25,50 35,50" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="27" cy="30" r="2" fill="#ffd700"/>
-  <circle cx="33" cy="30" r="2" fill="#ffd700"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XV</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">DEVIL</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><polygon points="30,25 35,45 25,45" fill="none" stroke="#ffd700" stroke-width="2"/><polygon points="30,65 25,50 35,50" fill="none" stroke="#ffd700" stroke-width="2"/><circle cx="27" cy="30" r="2" fill="#ffd700"/><circle cx="33" cy="30" r="2" fill="#ffd700"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XV</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">DEVIL</text></svg>`,
 
   // 16 - The Tower
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <rect x="20" y="35" width="20" height="30" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <polygon points="18,30 30,20 42,30" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <line x1="28" y1="20" x2="30" y2="15" stroke="#ffd700" stroke-width="1"/>
-  <line x1="32" y1="20" x2="34" y2="15" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XVI</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">TOWER</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><rect x="20" y="35" width="20" height="30" fill="none" stroke="#ffd700" stroke-width="2"/><polygon points="18,30 30,20 42,30" fill="none" stroke="#ffd700" stroke-width="1"/><line x1="28" y1="20" x2="30" y2="15" stroke="#ffd700" stroke-width="1"/><line x1="32" y1="20" x2="34" y2="15" stroke="#ffd700" stroke-width="1"/><text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XVI</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">TOWER</text></svg>`,
 
   // 17 - The Star
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <polygon points="30,25 32,35 42,35 34,42 37,52 30,47 23,52 26,42 18,35 28,35" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="22" cy="30" r="1" fill="#ffd700"/>
-  <circle cx="38" cy="30" r="1" fill="#ffd700"/>
-  <circle cx="25" cy="60" r="1" fill="#ffd700"/>
-  <circle cx="35" cy="60" r="1" fill="#ffd700"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XVII</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">STAR</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><polygon points="30,25 32,35 42,35 34,42 37,52 30,47 23,52 26,42 18,35 28,35" fill="none" stroke="#ffd700" stroke-width="1"/><circle cx="22" cy="30" r="1" fill="#ffd700"/><circle cx="38" cy="30" r="1" fill="#ffd700"/><circle cx="25" cy="60" r="1" fill="#ffd700"/><circle cx="35" cy="60" r="1" fill="#ffd700"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="10">XVII</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">STAR</text></svg>`,
 
   // 18 - The Moon
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <path d="M 30 25 Q 22 35 30 45 Q 38 35 30 25" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="26" cy="35" r="2" fill="#ffd700"/>
-  <circle cx="34" cy="35" r="2" fill="#ffd700"/>
-  <path d="M 20 60 Q 30 65 40 60" stroke="#ffd700" stroke-width="1" fill="none"/>
-  <text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="9">XVIII</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">MOON</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><path d="M 30 25 Q 22 35 30 45 Q 38 35 30 25" fill="none" stroke="#ffd700" stroke-width="2"/><circle cx="26" cy="35" r="2" fill="#ffd700"/><circle cx="34" cy="35" r="2" fill="#ffd700"/><path d="M 20 60 Q 30 65 40 60" stroke="#ffd700" stroke-width="1" fill="none"/><text x="30" y="20" text-anchor="middle" fill="#ffd700" font-size="9">XVIII</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">MOON</text></svg>`,
 
   // 19 - The Sun
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="30" cy="45" r="12" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <line x1="30" y1="20" x2="30" y2="25" stroke="#ffd700" stroke-width="1"/>
-  <line x1="30" y1="65" x2="30" y2="70" stroke="#ffd700" stroke-width="1"/>
-  <line x1="15" y1="45" x2="20" y2="45" stroke="#ffd700" stroke-width="1"/>
-  <line x1="40" y1="45" x2="45" y2="45" stroke="#ffd700" stroke-width="1"/>
-  <line x1="22" y1="30" x2="24" y2="32" stroke="#ffd700" stroke-width="1"/>
-  <line x1="38" y1="60" x2="36" y2="58" stroke="#ffd700" stroke-width="1"/>
-  <line x1="38" y1="30" x2="36" y2="32" stroke="#ffd700" stroke-width="1"/>
-  <line x1="22" y1="60" x2="24" y2="58" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XIX</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">SUN</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><circle cx="30" cy="45" r="12" fill="none" stroke="#ffd700" stroke-width="2"/><line x1="30" y1="20" x2="30" y2="25" stroke="#ffd700" stroke-width="1"/><line x1="30" y1="65" x2="30" y2="70" stroke="#ffd700" stroke-width="1"/><line x1="15" y1="45" x2="20" y2="45" stroke="#ffd700" stroke-width="1"/><line x1="40" y1="45" x2="45" y2="45" stroke="#ffd700" stroke-width="1"/><text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XIX</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">SUN</text></svg>`,
 
   // 20 - Judgement
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <polygon points="25,30 30,20 35,30" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <rect x="27" y="30" width="6" height="15" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="22" cy="55" r="3" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="30" cy="55" r="3" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="38" cy="55" r="3" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XX</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">JUDGEMENT</text>
-</svg>`,
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><polygon points="25,30 30,20 35,30" fill="none" stroke="#ffd700" stroke-width="1"/><rect x="27" y="30" width="6" height="15" fill="none" stroke="#ffd700" stroke-width="1"/><circle cx="22" cy="55" r="3" fill="none" stroke="#ffd700" stroke-width="1"/><circle cx="30" cy="55" r="3" fill="none" stroke="#ffd700" stroke-width="1"/><circle cx="38" cy="55" r="3" fill="none" stroke="#ffd700" stroke-width="1"/><text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XX</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="6">JUDGEMENT</text></svg>`,
 
   // 21 - The World
-  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="30" cy="45" r="15" fill="none" stroke="#ffd700" stroke-width="2"/>
-  <circle cx="30" cy="45" r="8" fill="none" stroke="#ffd700" stroke-width="1"/>
-  <circle cx="30" cy="45" r="3" fill="#ffd700"/>
-  <rect x="15" y="30" width="3" height="3" fill="#ffd700"/>
-  <rect x="42" y="30" width="3" height="3" fill="#ffd700"/>
-  <rect x="15" y="57" width="3" height="3" fill="#ffd700"/>
-  <rect x="42" y="57" width="3" height="3" fill="#ffd700"/>
-  <text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XXI</text>
-  <text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">WORLD</text>
-</svg>`
+  `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="#ffd700" stroke-width="1"/><circle cx="30" cy="45" r="15" fill="none" stroke="#ffd700" stroke-width="2"/><circle cx="30" cy="45" r="8" fill="none" stroke="#ffd700" stroke-width="1"/><circle cx="30" cy="45" r="3" fill="#ffd700"/><rect x="15" y="30" width="3" height="3" fill="#ffd700"/><rect x="42" y="30" width="3" height="3" fill="#ffd700"/><rect x="15" y="57" width="3" height="3" fill="#ffd700"/><rect x="42" y="57" width="3" height="3" fill="#ffd700"/><text x="30" y="15" text-anchor="middle" fill="#ffd700" font-size="10">XXI</text><text x="30" y="85" text-anchor="middle" fill="#ffd700" font-size="7">WORLD</text></svg>`
 ];
+
+// Minor Arcana - Generate programmatically
+const generateMinorArcanaCard = (cardId: number, suitName: string, suitSymbol: string, suitColor: string): string => {
+  const rank = ((cardId - 22) % 14) + 1;
+  const rankName = rank === 1 ? 'A' : rank === 11 ? 'J' : rank === 12 ? 'Q' : rank === 13 ? 'K' : rank.toString();
+
+  return `<svg width="60" height="90" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="90" fill="#1a1a2e" stroke="${suitColor}" stroke-width="1"/><text x="30" y="25" text-anchor="middle" fill="${suitColor}" font-size="14">${suitSymbol}</text><text x="30" y="50" text-anchor="middle" fill="${suitColor}" font-size="16" font-weight="bold">${rankName}</text><text x="30" y="80" text-anchor="middle" fill="${suitColor}" font-size="8">${suitName}</text></svg>`;
+};
+
+// Generate all 56 Minor Arcana cards
+const MINOR_ARCANA_SVGS: string[] = [];
+
+// Wands (22-35) - Fire/Red
+for (let i = 22; i <= 35; i++) {
+  MINOR_ARCANA_SVGS.push(generateMinorArcanaCard(i, 'WANDS', '⚡', '#e74c3c'));
+}
+
+// Cups (36-49) - Water/Blue
+for (let i = 36; i <= 49; i++) {
+  MINOR_ARCANA_SVGS.push(generateMinorArcanaCard(i, 'CUPS', '♡', '#3498db'));
+}
+
+// Swords (50-63) - Air/Purple
+for (let i = 50; i <= 63; i++) {
+  MINOR_ARCANA_SVGS.push(generateMinorArcanaCard(i, 'SWORDS', '⚔', '#9b59b6'));
+}
+
+// Pentacles (64-77) - Earth/Yellow
+for (let i = 64; i <= 77; i++) {
+  MINOR_ARCANA_SVGS.push(generateMinorArcanaCard(i, 'PENTACLES', '◈', '#f1c40f'));
+}
+
+// Complete deck: 22 Major + 56 Minor = 78 cards
+const ALL_TAROT_CARDS = [...MAJOR_ARCANA_SVGS, ...MINOR_ARCANA_SVGS];
 
 // ============================================================================
 // PROGRAM CONFIGURATION
@@ -262,7 +133,7 @@ const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 // CYBERDAMUS CLIENT CLASS
 // ============================================================================
 
-export class CyberDamusClient {
+class CyberDamusClient {
   private program: Program;
   private provider: AnchorProvider;
   private programId: PublicKey;
@@ -273,7 +144,7 @@ export class CyberDamusClient {
       wallet,
       { commitment: "confirmed" }
     );
-    anchor.setProvider(this.provider);
+    setProvider(this.provider);
 
     this.programId = PROGRAM_ID;
 
@@ -392,18 +263,18 @@ export class CyberDamusClient {
     }
   }
 
-  // Upload cards in batches (22 Major Arcana only)
+  // Upload cards in batches (all 78 cards)
   async uploadCards(): Promise<void> {
     const [oracleStatePDA] = this.getOracleStatePDA();
     const [cardLibraryPDA] = this.getCardLibraryPDA();
 
-    console.log("📝 Uploading 22 Major Arcana cards...");
+    console.log("📝 Uploading 78 Tarot cards (22 Major + 56 Minor Arcana)...");
 
-    const batchSize = 5; // Smaller batches for Playground
-    const totalCards = MAJOR_ARCANA_SVGS.length;
+    const batchSize = 8; // Smaller batches for reliability
+    const totalCards = ALL_TAROT_CARDS.length;
 
     for (let i = 0; i < totalCards; i += batchSize) {
-      const batch = MAJOR_ARCANA_SVGS.slice(i, i + batchSize);
+      const batch = ALL_TAROT_CARDS.slice(i, i + batchSize);
       const startIndex = i;
 
       console.log(`📦 Uploading batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(totalCards/batchSize)} (cards ${startIndex}-${startIndex + batch.length - 1})...`);
@@ -432,7 +303,7 @@ export class CyberDamusClient {
       }
     }
 
-    console.log("🎉 All 22 cards uploaded successfully!");
+    console.log("🎉 All 78 cards uploaded successfully!");
   }
 
   // Create a fortune reading
@@ -529,7 +400,7 @@ export class CyberDamusClient {
     }
   }
 
-  // Get card name by ID
+  // Get card name by ID - Full 78-card deck
   getCardName(cardId: number): string {
     const majorArcana = [
       "The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor",
@@ -540,6 +411,22 @@ export class CyberDamusClient {
 
     if (cardId < 22) {
       return majorArcana[cardId];
+    } else if (cardId < 36) {
+      const rank = (cardId - 22) + 1;
+      const rankName = rank === 1 ? 'Ace' : rank === 11 ? 'Page' : rank === 12 ? 'Knight' : rank === 13 ? 'Queen' : rank === 14 ? 'King' : rank.toString();
+      return `${rankName} of Wands`;
+    } else if (cardId < 50) {
+      const rank = (cardId - 36) + 1;
+      const rankName = rank === 1 ? 'Ace' : rank === 11 ? 'Page' : rank === 12 ? 'Knight' : rank === 13 ? 'Queen' : rank === 14 ? 'King' : rank.toString();
+      return `${rankName} of Cups`;
+    } else if (cardId < 64) {
+      const rank = (cardId - 50) + 1;
+      const rankName = rank === 1 ? 'Ace' : rank === 11 ? 'Page' : rank === 12 ? 'Knight' : rank === 13 ? 'Queen' : rank === 14 ? 'King' : rank.toString();
+      return `${rankName} of Swords`;
+    } else if (cardId < 78) {
+      const rank = (cardId - 64) + 1;
+      const rankName = rank === 1 ? 'Ace' : rank === 11 ? 'Page' : rank === 12 ? 'Knight' : rank === 13 ? 'Queen' : rank === 14 ? 'King' : rank.toString();
+      return `${rankName} of Pentacles`;
     } else {
       return "Unknown Card";
     }
@@ -548,7 +435,11 @@ export class CyberDamusClient {
   // Simple ASCII art representation
   private displayCardArt(card1: number, card2: number, card3: number): void {
     const getCardSymbol = (cardId: number): string => {
-      return "⭐"; // All Major Arcana
+      if (cardId < 22) return "⭐"; // Major Arcana
+      if (cardId < 36) return "⚡"; // Wands
+      if (cardId < 50) return "♡"; // Cups
+      if (cardId < 64) return "⚔"; // Swords
+      return "◈"; // Pentacles
     };
 
     console.log(`    ┌─────┐   ┌─────┐   ┌─────┐`);
@@ -617,8 +508,8 @@ async function requestAirdrop(wallet: PublicKey, amount: number): Promise<void> 
 // ============================================================================
 
 async function runCyberDamusTest(): Promise<void> {
-  console.log("🔮 CYBERDAMUS - SOLANA PLAYGROUND TEST");
-  console.log("=" + "=".repeat(50));
+  console.log("🔮 CYBERDAMUS - FULL 78-CARD TAROT ORACLE TEST");
+  console.log("=" + "=".repeat(55));
 
   // Setup - In Playground, use the connected wallet
   const wallet = (window as any).solana; // Phantom wallet
@@ -653,13 +544,13 @@ async function runCyberDamusTest(): Promise<void> {
 
     console.log("✅ Oracle initialization successful!");
 
-    // Test 2: Upload Cards
-    console.log("\n📋 TEST 2: Upload 22 Major Arcana Cards");
+    // Test 2: Upload All 78 Cards
+    console.log("\n📋 TEST 2: Upload 78 Tarot Cards");
     console.log("-".repeat(30));
 
     await client.uploadCards();
 
-    console.log("✅ All cards uploaded successfully!");
+    console.log("✅ All 78 cards uploaded successfully!");
 
     // Test 3: Check User Stats (should be empty)
     console.log("\n📋 TEST 3: Check Initial User Stats");
@@ -693,7 +584,7 @@ async function runCyberDamusTest(): Promise<void> {
 
     try {
       console.log("⏰ Attempting second fortune immediately (should fail)...");
-      const fortune2 = await client.divineFortune();
+      await client.divineFortune();
       console.log("❌ ERROR: Second fortune should have failed due to cooldown!");
     } catch (error) {
       console.log("✅ Cooldown working correctly! Error:", (error as Error).message);
@@ -713,8 +604,25 @@ async function runCyberDamusTest(): Promise<void> {
       console.log("❌ ERROR: Cards are not unique!", cards);
     }
 
-    // Test 8: Final Balance Check
-    console.log("\n📋 TEST 8: Transaction Cost Analysis");
+    // Test 8: Test Full Deck Range
+    console.log("\n📋 TEST 8: Verify Full Deck Range");
+    console.log("-".repeat(30));
+
+    const allCardIds = cards;
+    const inValidRange = allCardIds.every(id => id >= 0 && id <= 77);
+    console.log("✅ All cards in valid range (0-77):", inValidRange);
+
+    const cardTypes = allCardIds.map(id => {
+      if (id < 22) return "Major Arcana";
+      if (id < 36) return "Wands";
+      if (id < 50) return "Cups";
+      if (id < 64) return "Swords";
+      return "Pentacles";
+    });
+    console.log("🎴 Card types drawn:", cardTypes);
+
+    // Test 9: Final Balance Check
+    console.log("\n📋 TEST 9: Transaction Cost Analysis");
     console.log("-".repeat(30));
 
     const finalBalance = await connection.getBalance(wallet.publicKey);
@@ -722,18 +630,21 @@ async function runCyberDamusTest(): Promise<void> {
     console.log(`💸 Total cost: ~${((balance - finalBalance) / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
 
     console.log("\n🎉 ALL TESTS COMPLETED SUCCESSFULLY!");
-    console.log("=" + "=".repeat(50));
+    console.log("=" + "=".repeat(55));
 
     // Summary
     console.log("\n📋 TEST SUMMARY:");
     console.log("✅ Oracle initialization");
-    console.log("✅ Card library upload (22 Major Arcana)");
+    console.log("✅ Full 78-card library upload");
     console.log("✅ Fortune creation with unique cards");
+    console.log("✅ Full deck range verification");
     console.log("✅ User cooldown system");
-    console.log("✅ Rarity calculation");
+    console.log("✅ Complete rarity calculation");
     console.log("✅ Transaction cost analysis");
 
-    console.log("\n🔮 CyberDamus Oracle is working perfectly!");
+    console.log("\n🔮 CyberDamus Full Tarot Oracle is working perfectly!");
+    console.log("🎴 456,456 possible card combinations available!");
+    console.log("🌟 Major & Minor Arcana with authentic suit detection!");
 
   } catch (error) {
     console.error("❌ TEST FAILED:", error);
@@ -749,14 +660,16 @@ async function runCyberDamusTest(): Promise<void> {
 (window as any).CyberDamus = {
   runTest: runCyberDamusTest,
   CyberDamusClient,
-  PROGRAM_ID: PROGRAM_ID.toString()
+  PROGRAM_ID: PROGRAM_ID.toString(),
+  cardCount: ALL_TAROT_CARDS.length
 };
 
 // Auto-run when connected
 if (typeof window !== 'undefined') {
-  console.log("🔮 CyberDamus Client loaded!");
-  console.log("Run CyberDamus.runTest() to start testing");
-  console.log("Update PROGRAM_ID after deployment!");
+  console.log("🔮 CyberDamus FULL Tarot Client loaded!");
+  console.log("📊 Total cards: 78 (22 Major + 56 Minor Arcana)");
+  console.log("🎯 Run CyberDamus.runTest() to start testing");
+  console.log("⚠️ Update PROGRAM_ID after deployment!");
 }
 
 export { runCyberDamusTest, CyberDamusClient };

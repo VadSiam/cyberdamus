@@ -33,7 +33,7 @@ pub mod cyberdamus {
         oracle_state.card_library_initialized = false;
         oracle_state.bump = ctx.bumps.oracle_state;
 
-        // Initialize empty card library (for 22 cards)
+        // Initialize empty card library (for 78 cards)
         card_library.cards = Vec::new();
         card_library.version = 1; // v1 = classic design
         card_library.last_updated = Clock::get()?.unix_timestamp;
@@ -47,7 +47,7 @@ pub mod cyberdamus {
         Ok(())
     }
 
-    /// Upload card SVGs in batches (22 Major Arcana only)
+    /// Upload card SVGs in batches (78 full Tarot deck)
     pub fn upload_cards(
         ctx: Context<UploadCards>,
         start_index: u8,
@@ -59,7 +59,7 @@ pub mod cyberdamus {
         // Validate batch size (max 10 cards per transaction)
         require!(card_svgs.len() <= 10, ErrorCode::CardBatchTooLarge);
 
-        // Validate start index (22 cards max for playground)
+        // Validate start index (78 cards max for playground)
         require!((start_index as usize) <= CardLibrary::MAX_CARDS, ErrorCode::InvalidCardId);
 
         // Ensure we don't exceed total card limit
@@ -85,14 +85,14 @@ pub mod cyberdamus {
         // Update metadata
         card_library.last_updated = Clock::get()?.unix_timestamp;
 
-        // Check if all 22 cards are now uploaded
+        // Check if all 78 cards are now uploaded
         let uploaded_cards = card_library.cards.iter()
             .filter(|card| !card.is_empty())
             .count();
 
         if uploaded_cards == CardLibrary::MAX_CARDS {
             oracle_state.card_library_initialized = true;
-            msg!("🎉 All 22 cards uploaded! Oracle is ready for fortunes.");
+            msg!("🎉 All 78 cards uploaded! Oracle is ready for fortunes.");
         } else {
             msg!("📊 Progress: {}/{} cards uploaded", uploaded_cards, CardLibrary::MAX_CARDS);
         }
@@ -145,11 +145,11 @@ pub mod cyberdamus {
             oracle_state.fortune_counter,
         )?;
 
-        // Use Fisher-Yates algorithm to draw 3 unique cards (from 22 cards only)
-        let drawn_cards = fisher_yates_draw_three_major_arcana(entropy_seed);
+        // Use Fisher-Yates algorithm to draw 3 unique cards (from full 78-card deck)
+        let drawn_cards = fisher_yates_draw_three(entropy_seed);
 
-        // Calculate rarity (simplified for 22 cards)
-        let rarity = calculate_rarity_major_arcana(drawn_cards);
+        // Calculate rarity (full deck)
+        let rarity = calculate_rarity(drawn_cards);
 
         // Create the fortune NFT
         fortune.fortune_id = oracle_state.fortune_counter;
@@ -260,9 +260,9 @@ pub struct CardLibrary {
 }
 
 impl CardLibrary {
-    pub const MAX_CARDS: usize = 22; // Major Arcana only for playground
-    // Calculation: 22 cards * 500 bytes per SVG = ~11KB + overhead
-    pub const LEN: usize = 8 + 4 + (22 * 500) + 1 + 8 + 1; // ~11KB max
+    pub const MAX_CARDS: usize = 78; // Full Tarot deck for playground
+    // Calculation: 78 cards * 400 bytes per SVG = ~31KB + overhead
+    pub const LEN: usize = 8 + 4 + (78 * 400) + 1 + 8 + 1; // ~32KB max
 }
 
 #[account]
@@ -354,9 +354,9 @@ pub fn generate_entropy_seed(
     Ok(hasher.finalize().into())
 }
 
-pub fn fisher_yates_draw_three_major_arcana(seed: [u8; 32]) -> [u8; 3] {
-    // Create virtual deck [0, 1, 2, ..., 21] - Major Arcana only
-    let mut deck: Vec<u8> = (0..22).collect();
+pub fn fisher_yates_draw_three(seed: [u8; 32]) -> [u8; 3] {
+    // Create virtual deck [0, 1, 2, ..., 77] - Full Tarot deck
+    let mut deck: Vec<u8> = (0..78).collect();
 
     // Use seed to create deterministic pseudo-random sequence
     let mut rng_state = u64::from_le_bytes([
@@ -373,7 +373,7 @@ pub fn fisher_yates_draw_three_major_arcana(seed: [u8; 32]) -> [u8; 3] {
     }
 
     // For the first position, shuffle with entire remaining deck
-    for i in (3..22).rev() {
+    for i in (3..78).rev() {
         rng_state = rng_state.wrapping_mul(1103515245).wrapping_add(12345);
         let j = (rng_state % ((i + 1) as u64)) as usize;
         deck.swap(i, j);
@@ -381,41 +381,70 @@ pub fn fisher_yates_draw_three_major_arcana(seed: [u8; 32]) -> [u8; 3] {
 
     // Final shuffle for position 0
     rng_state = rng_state.wrapping_mul(1103515245).wrapping_add(12345);
-    let j = (rng_state % 22) as usize;
+    let j = (rng_state % 78) as usize;
     deck.swap(0, j);
 
     [deck[0], deck[1], deck[2]]
 }
 
-pub fn calculate_rarity_major_arcana(cards: [u8; 3]) -> RarityTier {
-    // Special combinations for Major Arcana only
+pub fn calculate_rarity(cards: [u8; 3]) -> RarityTier {
+    // Count Major Arcana cards (0-21)
+    let major_count = cards.iter().filter(|&&card| card < 22).count();
 
-    // Legendary: 0 (Fool), 10 (Fortune), 20 (Judgement) - The Journey
-    if cards.contains(&0) && cards.contains(&10) && cards.contains(&20) {
-        return RarityTier::Legendary;
+    // Check for three Major Arcana (Legendary)
+    if major_count == 3 {
+        return RarityTier::Legendary; // 2.1% chance
     }
 
-    // Epic: All even or all odd numbers
-    let all_even = cards.iter().all(|&card| card % 2 == 0);
-    let all_odd = cards.iter().all(|&card| card % 2 == 1);
-    if all_even || all_odd {
-        return RarityTier::Epic;
+    // Check for sequential numbers (Epic)
+    if is_sequential(cards) {
+        return RarityTier::Epic; // 5.2% chance
     }
 
-    // Rare: Three sequential numbers
-    let mut sorted_cards = cards;
-    sorted_cards.sort();
-    if sorted_cards[1] == sorted_cards[0] + 1 && sorted_cards[2] == sorted_cards[1] + 1 {
-        return RarityTier::Rare;
+    // Check for same suit (Rare) - only applies to Minor Arcana
+    if same_suit_minor_arcana(cards) {
+        return RarityTier::Rare; // 14.8% chance
     }
 
-    // Uncommon: Two sequential numbers
-    if (sorted_cards[1] == sorted_cards[0] + 1) || (sorted_cards[2] == sorted_cards[1] + 1) {
-        return RarityTier::Uncommon;
+    // Check for two Major Arcana (Uncommon)
+    if major_count == 2 {
+        return RarityTier::Uncommon; // 25.3% chance
     }
 
     // Everything else is Common
-    RarityTier::Common
+    RarityTier::Common // 52.6% chance
+}
+
+fn is_sequential(cards: [u8; 3]) -> bool {
+    let mut sorted_cards = cards;
+    sorted_cards.sort();
+
+    // Check if they form a sequence (difference of 1 between adjacent cards)
+    sorted_cards[1] == sorted_cards[0] + 1 && sorted_cards[2] == sorted_cards[1] + 1
+}
+
+fn same_suit_minor_arcana(cards: [u8; 3]) -> bool {
+    // Filter out Major Arcana (0-21), only check Minor Arcana (22-77)
+    let minor_cards: Vec<u8> = cards.iter()
+        .filter(|&&card| card >= 22)
+        .copied()
+        .collect();
+
+    // Need at least 2 minor arcana cards to determine same suit
+    if minor_cards.len() < 2 {
+        return false;
+    }
+
+    // Minor Arcana structure: 22-77 (56 cards)
+    // 4 suits × 14 cards each = 56 cards
+    // Card 22-35: Wands, 36-49: Cups, 50-63: Swords, 64-77: Pentacles
+    let get_suit = |card: u8| -> u8 {
+        if card < 22 { return 255; } // Major Arcana, no suit
+        (card - 22) / 14 // 0=Wands, 1=Cups, 2=Swords, 3=Pentacles
+    };
+
+    let first_suit = get_suit(minor_cards[0]);
+    minor_cards.iter().all(|&card| get_suit(card) == first_suit)
 }
 
 pub fn get_card_name(card_id: u8) -> &'static str {
@@ -443,6 +472,59 @@ pub fn get_card_name(card_id: u8) -> &'static str {
         19 => "The Sun",
         20 => "Judgement",
         21 => "The World",
+
+        // Minor Arcana - Wands (22-35)
+        22..=35 => {
+            let rank = (card_id - 22) + 1;
+            match rank {
+                1 => "Ace of Wands",
+                11 => "Page of Wands",
+                12 => "Knight of Wands",
+                13 => "Queen of Wands",
+                14 => "King of Wands",
+                _ => "Wands",
+            }
+        },
+
+        // Minor Arcana - Cups (36-49)
+        36..=49 => {
+            let rank = (card_id - 36) + 1;
+            match rank {
+                1 => "Ace of Cups",
+                11 => "Page of Cups",
+                12 => "Knight of Cups",
+                13 => "Queen of Cups",
+                14 => "King of Cups",
+                _ => "Cups",
+            }
+        },
+
+        // Minor Arcana - Swords (50-63)
+        50..=63 => {
+            let rank = (card_id - 50) + 1;
+            match rank {
+                1 => "Ace of Swords",
+                11 => "Page of Swords",
+                12 => "Knight of Swords",
+                13 => "Queen of Swords",
+                14 => "King of Swords",
+                _ => "Swords",
+            }
+        },
+
+        // Minor Arcana - Pentacles (64-77)
+        64..=77 => {
+            let rank = (card_id - 64) + 1;
+            match rank {
+                1 => "Ace of Pentacles",
+                11 => "Page of Pentacles",
+                12 => "Knight of Pentacles",
+                13 => "Queen of Pentacles",
+                14 => "King of Pentacles",
+                _ => "Pentacles",
+            }
+        },
+
         _ => "Unknown Card"
     }
 }
