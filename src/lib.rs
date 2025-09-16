@@ -3,15 +3,30 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use sha2::{Digest, Sha256};
+use anchor_lang::solana_program::hash::hash;
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("ARbsxJniPmikzVUYeYKNNy8H6HD6Soqrt9ncj3a2iWtC");
 
 #[program]
 pub mod cyberdamus {
     use super::*;
 
     /// Initialize the CyberDamus oracle with configuration
+    // Reinitialize oracle (for updating treasury)
+    pub fn reinitialize(
+        ctx: Context<Reinitialize>,
+        fortune_fee: u64,
+    ) -> Result<()> {
+        let oracle_state = &mut ctx.accounts.oracle_state;
+
+        // Update treasury to new address
+        oracle_state.treasury = ctx.accounts.new_treasury.key();
+        oracle_state.fee = fortune_fee;
+
+        msg!("Oracle reinitialized with new treasury: {}", ctx.accounts.new_treasury.key());
+        Ok(())
+    }
+
     pub fn initialize(ctx: Context<Initialize>, fee: u64) -> Result<()> {
         let oracle_state = &mut ctx.accounts.oracle_state;
         let card_library = &mut ctx.accounts.card_library;
@@ -47,7 +62,7 @@ pub mod cyberdamus {
         Ok(())
     }
 
-    /// Upload card SVGs in batches (78 full Tarot deck)
+    /// Upload card icons in batches (78 full Tarot deck)
     pub fn upload_cards(
         ctx: Context<UploadCards>,
         start_index: u8,
@@ -56,8 +71,8 @@ pub mod cyberdamus {
         let oracle_state = &mut ctx.accounts.oracle_state;
         let card_library = &mut ctx.accounts.card_library;
 
-        // Validate batch size (max 10 cards per transaction)
-        require!(card_svgs.len() <= 10, ErrorCode::CardBatchTooLarge);
+        // Validate batch size (max 15 icons per transaction - much smaller than SVGs)
+        require!(card_svgs.len() <= 15, ErrorCode::CardBatchTooLarge);
 
         // Validate start index (78 cards max for playground)
         require!((start_index as usize) <= CardLibrary::MAX_CARDS, ErrorCode::InvalidCardId);
@@ -72,14 +87,14 @@ pub mod cyberdamus {
         }
 
         // Upload cards starting from start_index
-        for (i, svg) in card_svgs.iter().enumerate() {
+        for (i, icon) in card_svgs.iter().enumerate() {
             let card_index = start_index as usize + i;
 
-            // Validate SVG size (max 500 bytes per card for playground)
-            require!(svg.len() <= 500, ErrorCode::CardBatchTooLarge);
+            // Validate icon size (max 20 bytes per icon - much smaller!)
+            require!(icon.len() <= 20, ErrorCode::CardBatchTooLarge);
 
-            card_library.cards[card_index] = svg.clone();
-            msg!("📝 Card {} uploaded ({} bytes)", card_index, svg.len());
+            card_library.cards[card_index] = icon.clone();
+            msg!("🎴 Card {} uploaded: {}", card_index, icon);
         }
 
         // Update metadata
@@ -90,14 +105,16 @@ pub mod cyberdamus {
             .filter(|card| !card.is_empty())
             .count();
 
-        if uploaded_cards == CardLibrary::MAX_CARDS {
+        // Playground workaround: Mark as initialized at 70 cards due to 10KB limit
+        // TODO: Change back to 78 for production with proper account sizes
+        if uploaded_cards >= 70 {
             oracle_state.card_library_initialized = true;
-            msg!("🎉 All 78 cards uploaded! Oracle is ready for fortunes.");
+            msg!("🎉 {} cards uploaded! Oracle ready (Playground: 70/78 due to size limit)", uploaded_cards);
         } else {
             msg!("📊 Progress: {}/{} cards uploaded", uploaded_cards, CardLibrary::MAX_CARDS);
         }
 
-        msg!("🔮 Batch upload complete: {} cards uploaded starting from index {}",
+        msg!("🔮 Batch upload complete: {} icons uploaded starting from index {}",
              card_svgs.len(), start_index);
 
         Ok(())
@@ -201,12 +218,20 @@ pub mod cyberdamus {
     }
 
     /// Get fortune by ID (view function)
-    pub fn get_fortune(ctx: Context<GetFortune>, _fortune_id: u64) -> Result<Fortune> {
-        Ok(ctx.accounts.fortune.clone())
+    pub fn get_fortune(ctx: Context<GetFortune>, _fortune_id: u64) -> Result<()> {
+        let fortune = &ctx.accounts.fortune;
+
+        msg!("🔮 Fortune #{}", fortune.fortune_id);
+        msg!("Owner: {}", fortune.owner);
+        msg!("Cards: {:?}", fortune.cards);
+        msg!("Rarity: {:?}", fortune.rarity);
+        msg!("Timestamp: {}", fortune.timestamp);
+
+        Ok(())
     }
 
     /// Get card SVG by ID (view function)
-    pub fn get_card_svg(ctx: Context<GetCardSvg>, card_id: u8) -> Result<String> {
+    pub fn get_card_svg(ctx: Context<GetCardSvg>, card_id: u8) -> Result<()> {
         let card_library = &ctx.accounts.card_library;
 
         require!(
@@ -214,7 +239,10 @@ pub mod cyberdamus {
             ErrorCode::InvalidCardId
         );
 
-        Ok(card_library.cards[card_id as usize].clone())
+        let svg = &card_library.cards[card_id as usize];
+        msg!("Card {} SVG: {}", card_id, svg);
+
+        Ok(())
     }
 }
 
@@ -222,7 +250,7 @@ pub mod cyberdamus {
 // STATE STRUCTURES
 // ============================================================================
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RarityTier {
     Common,      // 52.6% - Mixed cards
     Uncommon,    // 25.3% - Two sequential
@@ -253,16 +281,16 @@ impl OracleState {
 
 #[account]
 pub struct CardLibrary {
-    pub cards: Vec<String>,         // 22 SVG strings (Major Arcana only)
+    pub cards: Vec<String>,         // 78 icon strings (full Tarot deck)
     pub version: u8,                // Design version (1 = classic, 2 = christmas, etc)
     pub last_updated: i64,          // Timestamp of last update
     pub bump: u8,                   // PDA bump
 }
 
 impl CardLibrary {
-    pub const MAX_CARDS: usize = 78; // Full Tarot deck for playground
-    // Calculation: 78 cards * 400 bytes per SVG = ~31KB + overhead
-    pub const LEN: usize = 8 + 4 + (78 * 400) + 1 + 8 + 1; // ~32KB max
+    pub const MAX_CARDS: usize = 78; // Full Tarot deck with icons
+    // Calculation: 78 cards * 10 bytes per icon = ~800 bytes + overhead
+    pub const LEN: usize = 8 + 4 + (78 * 10) + 1 + 8 + 1; // ~800 bytes (well under 10KB limit)
 }
 
 #[account]
@@ -339,19 +367,20 @@ pub fn generate_entropy_seed(
     slot: u64,
     fortune_counter: u64,
 ) -> Result<[u8; 32]> {
-    let mut hasher = Sha256::new();
-
-    // Combine all entropy sources
-    hasher.update(user.to_bytes());
-    hasher.update(timestamp.to_le_bytes());
-    hasher.update(slot.to_le_bytes());
-    hasher.update(fortune_counter.to_le_bytes());
+    // Combine all entropy sources into a single buffer
+    let mut data = Vec::new();
+    data.extend_from_slice(&user.to_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(&slot.to_le_bytes());
+    data.extend_from_slice(&fortune_counter.to_le_bytes());
 
     // Add some randomness from the clock
     let clock = Clock::get()?;
-    hasher.update(clock.slot.to_le_bytes());
+    data.extend_from_slice(&clock.slot.to_le_bytes());
 
-    Ok(hasher.finalize().into())
+    // Hash all the data to get a 32-byte seed
+    let hash_result = hash(&data);
+    Ok(hash_result.to_bytes())
 }
 
 pub fn fisher_yates_draw_three(seed: [u8; 32]) -> [u8; 3] {
@@ -554,6 +583,23 @@ pub fn format_fortune_reading(cards: [u8; 3], rarity: RarityTier) -> String {
 // ============================================================================
 // ACCOUNT STRUCTURES
 // ============================================================================
+
+#[derive(Accounts)]
+pub struct Reinitialize<'info> {
+    #[account(
+        mut,
+        seeds = [b"oracle_state"],
+        bump = oracle_state.bump,
+        constraint = oracle_state.authority == authority.key() @ ErrorCode::InvalidAuthority
+    )]
+    pub oracle_state: Account<'info, OracleState>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    /// CHECK: New treasury wallet
+    pub new_treasury: AccountInfo<'info>,
+}
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
