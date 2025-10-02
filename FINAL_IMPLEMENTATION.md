@@ -61,36 +61,50 @@ pub struct Oracle {
 Доступ: ipfs://{base_hash}/{card_id}.png
 ```
 
-### 3. NFT СТРУКТУРА (ОБНОВЛЕНО!)
+### 3. NFT СТРУКТУРА (Metaplex v2 Standard)
 ```
-NFT хранит (неизменно):
-- 3 числа (ID выпавших карт: 0-77)
-- Fortune Number (#1, #2, etc)
-- Timestamp создания
-- Block height
+On-chain хранится:
+- URI указывает на JSON: ipfs://{base}/{fortune_number}.json
+- 3 числа карт НЕ хранятся on-chain (только в JSON метадате)
+- Mint Account, Token Account, Metadata Account
 
-Metadata JSON на IPFS:
+Metadata JSON на IPFS (off-chain):
 {
-  "name": "CyberDamus Fortune #123",
-  "image": "ipfs://{base}/5.png",  // Past карта (первая)
-  "description": "Tarot reading #123 - Cards: 5 (The Hierophant), 23 (Two of Wands), 67 (Four of Pentacles)",
+  "name": "CyberDamus Fortune #1",
+  "symbol": "TAROT",
+  "description": "Tarot reading - Past: The Fool, Present: The Magician, Future: The High Priestess",
+  "image": "ipfs://{CID}/0.png",  // Past карта - показывается в кошельке
+  "properties": {
+    "files": [
+      {"uri": "ipfs://{CID}/0.png", "type": "image/png"},
+      {"uri": "ipfs://{CID}/1.png", "type": "image/png"},
+      {"uri": "ipfs://{CID}/55.png", "type": "image/png"}
+    ],
+    "category": "image"
+  },
   "attributes": [
-    {"trait_type": "Past", "value": "5", "card_name": "The Hierophant", "card_image": "ipfs://{base}/5.png"},
-    {"trait_type": "Present", "value": "23", "card_name": "Two of Wands", "card_image": "ipfs://{base}/23.png"},
-    {"trait_type": "Future", "value": "67", "card_name": "Four of Pentacles", "card_image": "ipfs://{base}/67.png"}
+    {"trait_type": "Past Card", "value": "The Fool"},
+    {"trait_type": "Present Card", "value": "The Magician"},
+    {"trait_type": "Future Card", "value": "The High Priestess"},
+    {"trait_type": "Card IDs", "value": "[0, 1, 55]"}
   ]
 }
 
 Компоненты NFT:
 - Mint Account (SPL token, supply=1)
 - Token Account (владение пользователя)
-- Metadata Account (Metaplex standard)
-- Master Edition Account (маркетплейс совместимость)
+- Metadata Account (Metaplex v2 standard)
+- Master Edition Account (TODO - для маркетплейс совместимости)
 
 Collection:
 - Название: "CyberDamus Tarot"
 - Symbol: "TAROT"
 - Торгуется на всех Solana маркетплейсах
+
+Важно:
+- Главная картинка: Past card (первая карта расклада)
+- Все 3 карты доступны через properties.files[]
+- Composite картинки НЕТ (76K комбинаций невозможно заранее создать)
 ```
 
 ## 💰 ЭКОНОМИКА ПРОЕКТА
@@ -298,21 +312,101 @@ cyberdamus_nft/
     └── setup_ipfs.ts      # Настройка IPFS directory
 ```
 
+## 🚀 ЭВОЛЮЦИЯ USER FLOW
+
+### MVP Devnet (СЕЙЧАС)
+**devnet.cyberdamus.com**
+```
+Пользователь → Подключить Phantom → Нажать "Получить гадание" → Оплата 0.05 SOL → NFT в кошельке
+```
+- ✅ Веб-интерфейс (dApp)
+- ✅ Вызов функции `mint_fortune_nft()` через Anchor
+- ✅ Интеграция возможна (через IDL для разработчиков)
+- ❌ Нельзя "просто отправить SOL" на адрес
+
+**Для разработчиков:**
+```typescript
+await program.methods.mintFortuneNft().rpc();
+```
+
+### Mainnet v1.0 (через 1-2 недели)
+**cyberdamus.com**
+```
+То же что devnet, но на реальной сети
+```
+- ✅ Проверенный код с devnet
+- ✅ Настоящие IPFS картинки
+- ✅ Upgrade authority = deployer (можем апгрейдить)
+- 📚 Документация API для интеграторов (создаем на этом этапе)
+
+### Mainnet v1.1 - UPGRADE (через 1-2 месяца)
+**Добавляем "просто отправь SOL"**
+```
+Пользователь → Отправить 0.05 SOL на адрес → Автоматически получить NFT
+```
+- ✅ Старые интеграции работают БЕЗ изменений
+- ✅ Fallback entrypoint обрабатывает простые переводы
+- ✅ Работает из ЛЮБОГО кошелька (Phantom, Solflare, Backpack...)
+- ✅ Интеграция в игры, приложения, другие сервисы
+
+**Upgrade через:**
+```bash
+anchor upgrade target/deploy/cyberdamus_nft.so \
+  --program-id 2zmR8N51Q7KYZqnzJJWaJkM3wbxwBqj2gimNPf8Ldqu7
+```
+
+### Mainnet v2.0 - IMMUTABLE (через год)
+**Навсегда неизменная программа**
+```bash
+solana program set-upgrade-authority \
+  2zmR8N51Q7KYZqnzJJWaJkM3wbxwBqj2gimNPf8Ldqu7 \
+  --final
+```
+- ✅ Полное доверие: код нельзя изменить НИКОГДА
+- ✅ Комиссия 0.05 SOL зафиксирована навсегда
+- ✅ Гарантия неизменности для всех пользователей
+
+---
+
 ## ✅ ЧЕКЛИСТ ЗАПУСКА
-- [x] Локальная разработка готова (Anchor версия)
-- [ ] Исправить критические проблемы:
-  - [ ] Master Edition Account добавлен
-  - [ ] Collection NFT создается при инициализации
-  - [ ] Blockhash энтропия исправлена
-  - [ ] Emergency pause механизм добавлен
-  - [ ] Metadata URI показывает Past карту
-- [ ] 78 карт загружено в IPFS directory (0.png - 77.png)
-- [ ] Получен базовый IPFS хеш директории
-- [ ] Полное тестирование на devnet:
-  - [ ] Initialize oracle
-  - [ ] Mint NFT с Master Edition
-  - [ ] Collection verification
-  - [ ] 100+ успешных минтов
+
+### Phase 2: Smart Contract ✅ COMPLETED
+- [x] Программа разработана (Anchor 0.31.1)
+- [x] Задеплоена на Devnet
+  - [x] Program ID: `2zmR8N51Q7KYZqnzJJWaJkM3wbxwBqj2gimNPf8Ldqu7`
+  - [x] Size: 304 KB (Anchor version)
+  - [x] Deploy cost: 2.17 SOL
+- [x] Oracle инициализирован на Devnet
+  - [x] PDA: `22qT1BuA8LCXq3faEV3dbxmdmHAxwamTDFvVdsJ4eYxR`
+  - [x] Authority/Treasury configured
+  - [⚠️] IPFS hash: TEST placeholder (need real assets!)
+- [x] Devnet scripts created
+  - [x] `scripts/init_oracle_devnet.ts`
+  - [x] `scripts/mint_nft_devnet.ts`
+
+### Phase 3: IPFS Assets ⚠️ BLOCKER
+- [ ] **CRITICAL:** Create 78 Tarot card designs
+  - [ ] 0-21: Major Arcana (22 cards)
+  - [ ] 22-35: Minor Arcana - Wands (14 cards)
+  - [ ] 36-49: Minor Arcana - Cups (14 cards)
+  - [ ] 50-63: Minor Arcana - Swords (14 cards)
+  - [ ] 64-77: Minor Arcana - Pentacles (14 cards)
+- [ ] Upload directory to IPFS (Pinata/NFT.Storage/web3.storage)
+- [ ] Get real CID (base hash)
+- [ ] Re-initialize Oracle OR add update function
+
+### Phase 4: Critical Code Fixes (Before Mainnet)
+- [ ] Master Edition Account добавлен
+- [ ] Collection NFT создается при инициализации
+- [ ] Blockhash энтропия исправлена
+- [ ] Emergency pause механизм добавлен
+- [ ] Metadata URI показывает Past карту
+
+### Phase 5: Devnet Testing (After IPFS Ready)
+- [x] Initialize oracle ✅
+- [ ] Mint NFT с Master Edition
+- [ ] Collection verification
+- [ ] 100+ успешных минтов
 - [ ] NFT правильно отображается:
   - [ ] В Phantom (Past карта как главное изображение)
   - [ ] Attributes содержат все 3 карты
@@ -345,29 +439,53 @@ cyberdamus_nft/
 - Collection и Master Edition для полной совместимости с маркетплейсами
 
 ## 🚀 СЛЕДУЮЩИЕ ШАГИ (ПРИОРИТЕТ)
-1. **КРИТИЧНО:** Исправить текущие проблемы кода:
-   - Добавить Master Edition Account
-   - Исправить blockhash энтропию
-   - Добавить Collection NFT
+
+### ✅ Завершено (2025-10-02)
+- Программа задеплоена на Devnet (Program: `2zmR8N51Q7KYZqnzJJWaJkM3wbxwBqj2gimNPf8Ldqu7`)
+- Oracle инициализирован (PDA: `22qT1BuA8LCXq3faEV3dbxmdmHAxwamTDFvVdsJ4eYxR`)
+- Devnet скрипты готовы
+
+### ⚠️ Критический Блокер
+1. **СОЗДАТЬ 78 TAROT CARD PNG** (0.png - 77.png)
+   - Major Arcana: 0-21
+   - Wands: 22-35
+   - Cups: 36-49
+   - Swords: 50-63
+   - Pentacles: 64-77
+
+2. **Загрузить на IPFS и получить CID**
+   - Pinata / NFT.Storage / web3.storage
+   - Получить реальный базовый хеш
+
+3. **Пере-инициализировать Oracle**
+   - Либо новый Oracle с реальным хешем
+   - Либо добавить `update_ipfs_hash()` функцию
+
+### Следующие Задачи
+4. **Исправить критические проблемы кода:**
+   - Master Edition Account
+   - Blockhash энтропия
+   - Collection NFT
    - Metadata URI → Past карта
    - Emergency pause механизм
-2. **ВАЖНО:** Написать полные тесты для mint_fortune_nft
-3. **ВАЖНО:** Создать 78 pixel art дизайнов карт (0.png - 77.png)
-4. **ВАЖНО:** Загрузить directory на IPFS и получить базовый хеш
-5. Devnet тестирование (100+ минтов)
-6. Anchor → Vanilla Solana migration
-7. Upgradeable деплой на mainnet
-8. (Через год) Финализация как immutable программа
+
+5. **Devnet тестирование с реальным IPFS** (100+ минтов)
+
+6. **Anchor → Vanilla Solana migration**
+
+7. **Upgradeable деплой на mainnet**
+
+8. **(Через год)** Финализация как immutable программа
 
 ---
 *Документ создан: 2025-09-18*
-*Документ обновлен: 2025-10-01*
-*Версия: 1.2 - Architecture finalization and branding*
+*Документ обновлен: 2025-10-02*
+*Версия: 1.3 - Devnet deployment status*
 
-**Ключевые изменения v1.2:**
-- ✅ Уточнена NFT структура: ссылки на 3 карты, не композит
-- ✅ Добавлен Master Edition Account (обязательно!)
-- ✅ Phase 2.5: Anchor → Vanilla Solana migration
-- ✅ Философия без rate limits
-- ✅ Брендинг: "CyberDamus Tarot" / "TAROT" / cyberdamus.com
-- ✅ Обновлена экономика с учетом Master Edition
+**Ключевые изменения v1.3:**
+- ✅ Devnet deployment completed
+- ✅ Program ID: `2zmR8N51Q7KYZqnzJJWaJkM3wbxwBqj2gimNPf8Ldqu7`
+- ✅ Oracle PDA: `22qT1BuA8LCXq3faEV3dbxmdmHAxwamTDFvVdsJ4eYxR`
+- ⚠️ IPFS hash placeholder identified - need real Tarot assets
+- ✅ Обновлен чеклист с текущим прогрессом
+- ✅ Приоритизированы следующие шаги (IPFS assets - blocker)
