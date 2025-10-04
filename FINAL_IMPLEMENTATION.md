@@ -1,46 +1,52 @@
-# 🔮 CYBERDAMUS NFT - ФИНАЛЬНЫЙ ПЛАН РЕАЛИЗАЦИИ
+# 🔮 CYBERDAMUS TOKEN-2022 - ФИНАЛЬНЫЙ ПЛАН РЕАЛИЗАЦИИ
 
-## 📊 ТЕКУЩИЙ СТАТУС РАЗРАБОТКИ (2025-09-28)
+## 📊 ТЕКУЩИЙ СТАТУС РАЗРАБОТКИ (2025-10-04)
 
-### ✅ ФАЗА 2 ЗАВЕРШЕНА - Smart Contract Development
-- **initialize_oracle()** - полностью реализована с IPFS хешем
-- **mint_fortune_nft()** - полностью реализована с Fisher-Yates алгоритмом
-- Функция get_card_name() содержит названия всех 78 карт Таро
-- Программа компилируется и деплоится успешно
-- Базовые тесты инициализации обновлены под новую структуру
+### 🔄 МИГРАЦИЯ: NFT → TOKEN-2022
+- **Предыдущая архитектура:** Metaplex NFT (deprecated)
+- **Новая архитектура:** Token-2022 с Metadata Extension
+- **Причины миграции:**
+  - 67% дешевле (0.0057 SOL vs 0.0175 SOL per mint)
+  - 100% децентрализация (метаданные on-chain)
+  - Полная свобода пользователей (no freeze authority)
+  - Единый cards.json для всех токенов (нет дубликатов)
+  - Карты видны в имени токена (любой кошелек)
 
-### ⚠️ ВАЖНОЕ ЗАМЕЧАНИЕ О ВОЗМОЖНОЙ МИГРАЦИИ
-- **Текущая реализация:** Anchor Framework 0.31.1
-- **Возможное требование:** Конвертация в vanilla Solana (без Anchor)
-- **Причины:**
-  - Дальнейшая оптимизация размера программы
-  - Специфические требования проекта
-  - Интеграция с существующими системами
-- **Статус:** Пока не подтверждено, требует обсуждения
+### ⚠️ TOKEN-2022 IMPLEMENTATION (IN PROGRESS)
+- **Oracle structure:** Готова (IPFS hash storage)
+- **Fisher-Yates algorithm:** Готов
+- **Token-2022 mint:** TODO - заменить mint_fortune_nft.rs
+- **Name encoding:** TODO - "CyberDamus #AABBCC" logic
+- **Metadata Extension:** TODO - additional_metadata setup
+- **IPFS cards.json:** TODO - create structure
 
 ### 🎯 СЛЕДУЮЩИЕ ШАГИ
-- [ ] Написать тесты для mint_fortune_nft()
-- [ ] Загрузить 78 карт на IPFS
-- [ ] Фаза 3: Frontend Development
+- [ ] Создать cards.json с метаданными 78 карт
+- [ ] Загрузить 78 PNG файлов + cards.json на IPFS
+- [ ] Реализовать mint_fortune_token() с Token-2022
+- [ ] Написать тесты для Token-2022
+- [ ] Фаза 3: Frontend Development (парсинг имени)
 - [ ] Фаза 4: Тестирование на Devnet
 - [ ] Фаза 5: Mainnet Deployment
-- [ ] Решение о миграции на vanilla Solana
 
 ## 📌 КЛЮЧЕВЫЕ РЕШЕНИЯ
-✅ **Дизайн карт:** НЕИЗМЕННЫЙ, один навсегда (pixel art в контракте)
+✅ **Архитектура:** Token-2022 с Metadata Extension (не NFT!)
+✅ **Дизайн карт:** НЕИЗМЕННЫЙ, один навсегда (78 PNG на IPFS)
+✅ **Метаданные:** Единый cards.json для ВСЕХ токенов
+✅ **Name encoding:** "CyberDamus #AABBCC" (карты видны сразу)
+✅ **Freeze authority:** None (полная свобода пользователей)
 ✅ **Изменяемый параметр:** ТОЛЬКО комиссия (раз в 3-6 месяцев)
-✅ **NFT:** Настоящие, торгуемые на маркетплейсах
 ✅ **Разработка:** ЛОКАЛЬНО, не в Playground
 
 ## 🏗️ АРХИТЕКТУРА
 
-### 1. УПРОЩЕННАЯ СТРУКТУРА БЕЗ CARDLIBRARY
+### 1. ORACLE STRUCTURE (без изменений)
 ```rust
 // Единственная структура данных
 pub struct Oracle {
     authority: Pubkey,              // 32 bytes - администратор
     treasury: Pubkey,               // 32 bytes - кошелек комиссий
-    total_fortunes: u64,            // 8 bytes - счетчик NFT
+    total_fortunes: u64,            // 8 bytes - счетчик токенов
     ipfs_base_hash: [u8; 46],       // 46 bytes - базовый IPFS хеш
     is_initialized: bool,           // 1 byte - флаг
     reserved: [u8; 5],              // 5 bytes - резерв
@@ -48,119 +54,113 @@ pub struct Oracle {
 }
 ```
 
-### 2. IPFS СТРУКТУРА
+### 2. IPFS СТРУКТУРА (новая)
 ```
 Единая директория на IPFS:
-├── 0.png    (The Fool)
-├── 1.png    (The Magician)
-├── 2.png    (The High Priestess)
+├── cards.json   (ОДИН файл для ВСЕХ токенов)
+├── 0.png        (The Fool)
+├── 1.png        (The Magician)
+├── 2.png        (The High Priestess)
 ├── ...
-└── 77.png   (King of Pentacles)
+└── 77.png       (King of Pentacles)
 
-Базовый хеш: QmXy7abc123...
-Доступ: ipfs://{base_hash}/{card_id}.png
+Базовый хеш: bafybei...
+Доступ к картинкам: ipfs://{base_hash}/{card_id}.png
+Доступ к метаданным: ipfs://{base_hash}/cards.json
 ```
 
-### 3. NFT СТРУКТУРА (Metaplex v2 Standard)
+### 3. TOKEN-2022 СТРУКТУРА (новая)
 ```
-On-chain хранится:
-- URI указывает на JSON: ipfs://{base}/{fortune_number}.json
-- 3 числа карт НЕ хранятся on-chain (только в JSON метадате)
-- Mint Account, Token Account, Metadata Account
+On-chain хранится (Metadata Extension, ~103 bytes):
+- name: "CyberDamus #AABBCC"  (21 bytes)
+  где AA, BB, CC = 2-значные ID карт (00-77)
+  Пример: "#000377" = карты [0, 3, 77]
+- symbol: "TAROT"  (5 bytes)
+- uri: "ipfs://{CID}/cards.json"  (40 bytes)
+- additional_metadata: [("fortune_number", "377")]  (37 bytes)
+- freeze_authority: None
 
-Metadata JSON на IPFS (off-chain):
+cards.json на IPFS (общий для всех токенов):
 {
-  "name": "CyberDamus Fortune #1",
-  "symbol": "TAROT",
-  "description": "Tarot reading - Past: The Fool, Present: The Magician, Future: The High Priestess",
-  "image": "ipfs://{CID}/0.png",  // Past карта - показывается в кошельке
-  "properties": {
-    "files": [
-      {"uri": "ipfs://{CID}/0.png", "type": "image/png"},
-      {"uri": "ipfs://{CID}/1.png", "type": "image/png"},
-      {"uri": "ipfs://{CID}/55.png", "type": "image/png"}
-    ],
-    "category": "image"
-  },
-  "attributes": [
-    {"trait_type": "Past Card", "value": "The Fool"},
-    {"trait_type": "Present Card", "value": "The Magician"},
-    {"trait_type": "Future Card", "value": "The High Priestess"},
-    {"trait_type": "Card IDs", "value": "[0, 1, 55]"}
+  "cards": [
+    {"id": 0, "name": "The Fool", "image": "ipfs://{CID}/0.png"},
+    {"id": 1, "name": "The Magician", "image": "ipfs://{CID}/1.png"},
+    ...
+    {"id": 77, "name": "King of Pentacles", "image": "ipfs://{CID}/77.png"}
   ]
 }
 
-Компоненты NFT:
-- Mint Account (SPL token, supply=1)
+Компоненты Token-2022:
+- Mint Account (Token-2022 + Metadata Extension, supply=1, decimals=0)
 - Token Account (владение пользователя)
-- Metadata Account (Metaplex v2 standard)
-- Master Edition Account (TODO - для маркетплейс совместимости)
+- Metadata встроена в Mint Account (не отдельный аккаунт!)
 
-Collection:
-- Название: "CyberDamus Tarot"
-- Symbol: "TAROT"
-- Торгуется на всех Solana маркетплейсах
-
-Важно:
-- Главная картинка: Past card (первая карта расклада)
-- Все 3 карты доступны через properties.files[]
-- Composite картинки НЕТ (76K комбинаций невозможно заранее создать)
+Frontend обработка:
+1. Парсинг name: "CyberDamus #000377" → [0, 3, 77]
+2. Fetch cards.json по uri
+3. Фильтрация: cards.filter(c => [0,3,77].includes(c.id))
+4. Отображение: Past (0), Present (3), Future (77)
 ```
 
-## 💰 ЭКОНОМИКА ПРОЕКТА
+## 💰 ЭКОНОМИКА ПРОЕКТА (Token-2022)
 
 ### РАЗОВЫЕ ЗАТРАТЫ (при деплое):
 - Программа (BPF bytecode): 0.52 SOL ($104)
-  - Anchor версия: ~200KB
-  - Vanilla Solana финал: ~60-80KB (экономия 60-70%)
+  - Anchor версия с Token-2022: ~90KB
+  - Без Metaplex зависимостей: экономия -80KB
 - Oracle PDA (132 bytes): 0.003 SOL ($0.60)
 - **ИТОГО:** 0.523 SOL (~$104.60)
 
-### СТОИМОСТЬ ОДНОГО NFT:
-- Mint account: 0.003 SOL ($0.60)
-- Token account: 0.003 SOL ($0.60)
-- Metadata account: 0.008 SOL ($1.60)
-- Master Edition account: 0.003 SOL ($0.60)
+### СТОИМОСТЬ ОДНОГО TOKEN-2022:
+- Mint account (Token-2022): 0.002 SOL ($0.40)
+- Metadata Extension (~103 bytes): 0.0012 SOL ($0.24)
+- Token account: 0.002 SOL ($0.40)
 - Transaction fees: 0.0005 SOL ($0.10)
-- **ИТОГО:** 0.0175 SOL ($3.50)
+- **ИТОГО:** 0.0057 SOL ($1.14)
+- **ЭКОНОМИЯ vs NFT:** 67% (-0.0118 SOL)
 
 ### ЦЕНА ДЛЯ ПОЛЬЗОВАТЕЛЯ:
 - Комиссия оракула: 0.05 SOL ($10) - ФИКСИРОВАННАЯ
-- Покрытие NFT: 0.0175 SOL ($3.50)
+- Покрытие Token-2022: 0.0057 SOL ($1.14)
 - Gas fee: 0.0005 SOL ($0.10)
-- **ИТОГО:** 0.068 SOL (~$13.60)
+- **ИТОГО:** 0.0562 SOL (~$11.24)
+- **ДЕШЕВЛЕ vs NFT:** 17% (-$2.36)
 
 ### ПРИБЫЛЬ:
-- С каждого NFT: 0.0325 SOL (~$6.50) чистыми
-- Окупаемость: после 17 NFT
-- 100 NFT = 2.73 SOL ($546)
-- 1000 NFT = 31.98 SOL ($6,396)
-- ROI: 265% на каждом NFT
+- С каждого токена: 0.0443 SOL (~$8.86) чистыми
+- Окупаемость: после **12 токенов** (vs 17 NFT)
+- 100 токенов = **3.90 SOL ($780)** (vs 2.73 SOL для NFT)
+- 1000 токенов = **43.77 SOL ($8,754)** (vs 31.98 SOL для NFT)
+- ROI: **777%** на каждом токене!
 
 ## 🔧 ТЕХНИЧЕСКАЯ РЕАЛИЗАЦИЯ
 
-### ФАЗА 1: ПОДГОТОВКА (День 1-2)
+### ФАЗА 1: ПОДГОТОВКА (День 1-2) ✅ ЗАВЕРШЕНА
 1. Установка Rust, Solana CLI, Anchor
 2. Создание проекта `anchor init cyberdamus_nft`
-3. Добавление Metaplex зависимостей
+3. Добавление Token-2022 зависимостей
 4. Конфигурация Cargo.toml с оптимизациями
 
-### ФАЗА 2: УПРОЩЕННЫЙ СМАРТ-КОНТРАКТ (День 3-5) ✅ ЗАВЕРШЕНА
+### ФАЗА 2: TOKEN-2022 MIGRATION (День 3-5) ⚠️ IN PROGRESS
+**TODO - Заменить mint_fortune_nft.rs:**
 ```rust
 // Только 2 функции!
-pub fn initialize_oracle(ipfs_base_hash: [u8; 46])  // Настройка оракула + IPFS
-pub fn mint_fortune_nft()                          // Создание NFT + Master Edition
+pub fn initialize_oracle(ipfs_base_hash: [u8; 46])  // ✅ Готова - IPFS hash storage
+pub fn mint_fortune_token()                          // ⚠️ TODO - Token-2022 mint
 // УБРАЛИ: upload_cards(), update_fee(), rarity - не нужны!
 ```
 
-**Что реализовано:**
+**Что есть (из NFT implementation):**
 - ✅ Oracle структура (132 bytes)
 - ✅ Fisher-Yates алгоритм для генерации уникальных карт
 - ✅ Все 78 названий карт Таро в get_card_name()
 - ✅ Transfer fee to treasury
-- ✅ Metadata creation с описанием карт
-- ⚠️ TODO: Master Edition Account (критично!)
-- ⚠️ TODO: Collection NFT creation
+
+**Что нужно заменить:**
+- ⚠️ TODO: Заменить Metaplex на Token-2022 program
+- ⚠️ TODO: Encode cards в name: "CyberDamus #AABBCC"
+- ⚠️ TODO: Set additional_metadata: fortune_number
+- ⚠️ TODO: Удалить Master Edition/Collection код (не нужно!)
 - ⚠️ TODO: Исправить blockhash энтропию
 - ⚠️ TODO: Emergency pause механизм
 
@@ -180,10 +180,12 @@ opt-level = "z"   # Максимальная оптимизация размер
 lto = "fat"       # Link Time Optimization
 ```
 
-### ФАЗА 2.5: ANCHOR → VANILLA SOLANA MIGRATION (День 6-10)
-**Цель:** Оптимизация размера программы с 200KB до 60-80KB
+### ФАЗА 2.5: ANCHOR → VANILLA SOLANA MIGRATION (День 6-10) - OPTIONAL
+**Цель:** Дальнейшая оптимизация размера программы с ~90KB до 60-80KB
 
-**План конвертации:**
+**Статус:** Рассматривается после успешного Token-2022 тестирования на devnet
+
+**План конвертации (если понадобится):**
 ```rust
 // 1. Удалить все Anchor macros
 // 2. Заменить на чистый Solana Rust
@@ -204,7 +206,7 @@ pub fn process_instruction(
 ) -> ProgramResult {
     match instruction_data[0] {
         0 => initialize_oracle(accounts, &instruction_data[1..]),
-        1 => mint_fortune_nft(accounts, &instruction_data[1..]),
+        1 => mint_fortune_token(accounts, &instruction_data[1..]),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
